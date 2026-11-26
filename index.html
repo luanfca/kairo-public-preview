@@ -14,31 +14,43 @@
 <main>
   <h1>Kairo Market Monitor</h1>
   <p>Compare buy and sell quotes across venues using simulated market data.</p>
+  <label>Alert threshold (%) <input id="threshold" type="number" value="0.1" step="0.01"></label>
   <button id="update" type="button">Update sample</button>
   <div class="quotes">
     <table>
-      <thead><tr><th>Pair</th><th>Buy ask</th><th>Sell bid</th><th>Gross spread</th></tr></thead>
+      <thead><tr><th>Pair</th><th>Buy ask</th><th>Sell bid</th><th>Gross spread</th><th>Recent spreads</th></tr></thead>
       <tbody id="quotes"></tbody>
     </table>
   </div>
   <p id="status" role="status"></p>
 </main>
-<script>
+<script type="module">
+  import { Monitor } from './monitor.mjs';
+  const monitor = new Monitor();
   const pairs = [['BTC/USDT', 64120, 64181], ['ETH/USDT', 3180, 3178], ['SOL/USDT', 142.35, 142.61]];
   const offsets = [0, 0.001, -0.001, 0.002];
   let sample = 0;
   function render() {
     const rows = document.querySelector('#quotes');
     rows.replaceChildren();
-    for (const [index, [pair, ask, bid]] of pairs.entries()) {
-      const sell = bid * (1 + offsets[(sample + index) % offsets.length]);
-      const spread = (sell - ask) / ask * 100;
+    const now = Date.now();
+    const books = pairs.flatMap(([pair, ask, bid], index) => {
+      const sell = Number((bid * (1 + offsets[(sample + index) % offsets.length])).toFixed(2));
+      return [
+        { pair, venue: 'Venue A', ask, bid: ask - 0.01, receivedAt: now },
+        { pair, venue: 'Venue B', ask: sell + 0.01, bid: sell, receivedAt: now },
+      ];
+    });
+    const threshold = document.querySelector('#threshold').valueAsNumber;
+    const opportunities = monitor.scan(books, now, Number.isFinite(threshold) ? threshold : Infinity);
+    for (const {pair, buy, sell, spread, history} of opportunities) {
       const row = rows.insertRow();
-      for (const value of [pair, `Venue A · ${ask.toFixed(2)}`, `Venue B · ${sell.toFixed(2)}`, `${spread.toFixed(2)}%`]) {
+      for (const value of [pair, `${buy.venue} · ${buy.ask.toFixed(2)}`, `${sell.venue} · ${sell.bid.toFixed(2)}`, `${spread.toFixed(2)}%`, history.slice(-5).map(point => `${point.spread.toFixed(2)}%`).join(' · ')]) {
         row.insertCell().textContent = value;
       }
     }
-    document.querySelector('#status').textContent = `Synthetic sample ${sample + 1}.`;
+    const alerts = opportunities.filter(row => row.alert).map(row => row.pair);
+    document.querySelector('#status').textContent = alerts.length ? `Threshold crossed: ${alerts.join(', ')}.` : `Synthetic sample ${sample + 1}.`;
   }
   document.querySelector('#update').addEventListener('click', () => { sample += 1; render(); });
   render();
