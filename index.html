@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kairo — Market Monitor Preview</title>
+<style>
+  body { font: 16px system-ui, sans-serif; background: #eaf1f5; color: #152d3e; margin: 0; }
+  main { max-width: 52rem; margin: 4rem auto; padding: 1.5rem; }
+  table { width: 100%; background: white; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: .8rem; text-align: left; border-bottom: 1px solid #dce5eb; }
+  button { margin: 1rem 0; padding: .65rem 1rem; background: #164e63; color: white; border: 0; border-radius: .4rem; cursor: pointer; }
+  .quotes { overflow-x: auto; }
+</style>
+<main>
+  <h1>Kairo Market Monitor</h1>
+  <p>Compare buy and sell quotes across venues using simulated market data.</p>
+  <button id="update" type="button">Update sample</button>
+  <div class="quotes">
+    <table>
+      <thead><tr><th>Pair</th><th>Buy ask</th><th>Sell bid</th><th>Gross spread</th></tr></thead>
+      <tbody id="quotes"></tbody>
+    </table>
+  </div>
+  <p id="status" role="status"></p>
+</main>
+<script>
+  const pairs = [['BTC/USDT', 64120, 64181], ['ETH/USDT', 3180, 3178], ['SOL/USDT', 142.35, 142.61]];
+  const offsets = [0, 0.001, -0.001, 0.002];
+  let sample = 0;
+  function render() {
+    const rows = document.querySelector('#quotes');
+    rows.replaceChildren();
+    for (const [index, [pair, ask, bid]] of pairs.entries()) {
+      const sell = bid * (1 + offsets[(sample + index) % offsets.length]);
+      const spread = (sell - ask) / ask * 100;
+      const row = rows.insertRow();
+      for (const value of [pair, `Venue A · ${ask.toFixed(2)}`, `Venue B · ${sell.toFixed(2)}`, `${spread.toFixed(2)}%`]) {
+        row.insertCell().textContent = value;
+      }
+    }
+    document.querySelector('#status').textContent = `Synthetic sample ${sample + 1}.`;
+  }
+  document.querySelector('#update').addEventListener('click', () => { sample += 1; render(); });
+  render();
+</script>
+</html>
